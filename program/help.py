@@ -14,9 +14,9 @@ class Help(commands.Cog):
         )
 
         embed.add_field(
-            name="未設定システム",
+            name="Youtube検索",
             value=(
-                "/？？？ … いいよこいよ！\n"
+                "/youtube title: … Youtubeの動画を検索します、一日の使用制限あり...\n"
             ),
             inline=False
         )
