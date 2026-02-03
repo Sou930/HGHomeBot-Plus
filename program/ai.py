@@ -1,96 +1,87 @@
 import os
 import discord
 from discord.ext import commands
-import aiohttp
+import re
+from openai import OpenAI
+from collections import defaultdict
 
-OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY")
-
-OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
-MODEL_NAME = "moonshotai/kimi-k2"
-
-class AI(commands.Cog):
+class AIChat(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
+        self.client = OpenAI(
+            base_url="https://openrouter.ai/api/v1",
+            api_key=os.environ.get("OPENROUTER_API_KEY"),
+        )
+
+        self.history = defaultdict(list)
+        self.MAX_HISTORY = 10
+
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
-        # Bot自身は無視
         if message.author.bot:
             return
 
         is_mention = self.bot.user in message.mentions
         is_reply = (
             message.reference
-            and isinstance(message.reference.resolved, discord.Message)
+            and message.reference.resolved
             and message.reference.resolved.author == self.bot.user
         )
 
-        # メンション or Botへの返信 以外は無視
         if not is_mention and not is_reply:
             return
 
-        # メンションを除去
-        content = message.content.replace(f"<@{self.bot.user.id}>", "").strip()
-
-        # 空なら何もしない
+        content = re.sub(f'<@{self.bot.user.id}>', '', message.content).strip()
         if not content:
             return
 
-        await message.channel.typing()
+        async with message.channel.typing():
+            try:
+                history_key = str(message.channel.id)
 
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    OPENROUTER_URL,
-                    headers={
-                        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                        "Content-Type": "application/json",
-                        "HTTP-Referer": "https://discord.com",
-                        "X-Title": "Discord KimiK2 Bot"
-                    },
-                    json={
-                        "model": MODEL_NAME,
-                        "messages": [
-                            {
-                                "role": "system",
-                                "content": "あなたは親しみやすくフレンドリーなAIです。"
-                            },
-                            {
-                                "role": "user",
-                                "content": content
-                            }
-                        ],
-                        "temperature": 0.7
-                    },
-                    timeout=aiohttp.ClientTimeout(total=50)
-                ) as resp:
+                messages_for_ai = []
 
-                    if resp.status != 200:
-                        await message.reply(
-                            "⌛ AIの応答が遅すぎます…\n"
-                            "少し待ってからもう一回試してください"
-                        )
-                        return
+                for h in self.history[history_key][-self.MAX_HISTORY:]:
+                    messages_for_ai.append(h)
 
-                    data = await resp.json()
-                    reply = data["choices"][0]["message"]["content"]
+                prompt = (
+                    "【設定：あなたは親しみやすく優秀なAIです。"
+                    "日本語で短く簡潔に回答してください。】\n"
+                    f"質問：{content}"
+                )
 
-        except aiohttp.TimeoutError:
-            await message.reply(
-                "⌛ AIの応答が遅すぎます…\n"
-                "少し待ってからもう一回試してください"
-            )
-            return
+                messages_for_ai.append(
+                    {"role": "user", "content": prompt}
+                )
 
-        except aiohttp.ClientError:
-            await message.reply("❌ 通信エラーが起きました")
-            return
+                response = self.client.chat.completions.create(
+                    model="google/gemma-3n-e2b-it:free",
+                    messages=messages_for_ai,
+                    timeout=30.0
+                )
 
-        # Discord文字数制限対策
-        if len(reply) > 2000:
-            reply = reply[:1990] + "…"
+                ai_reply = response.choices[0].message.content
 
-        await message.reply(reply)
+                self.history[history_key].append(
+                    {"role": "user", "content": content}
+                )
+                self.history[history_key].append(
+                    {"role": "assistant", "content": ai_reply}
+                )
+
+                if len(ai_reply) > 2000:
+                    for i in range(0, len(ai_reply), 2000):
+                        await message.reply(ai_reply[i:i+2000])
+                else:
+                    await message.reply(ai_reply)
+
+            except Exception as e:
+                print(f"AI Error: {e}")
+                await message.reply(
+                    "⚠️ AIエラーが発生しました。\n"
+                    "しばらく待ってからもう一度試してください。"
+                )
 
 async def setup(bot):
-    await bot.add_cog(AI(bot))
+    await bot.add_cog(AIChat(bot))
