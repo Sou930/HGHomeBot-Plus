@@ -9,22 +9,25 @@ class Help(commands.Cog):
     @app_commands.command(name="help", description="ヘルプを表示します")
     async def help(self, interaction: discord.Interaction):
         embed = discord.Embed(
-            title="ℹ️ヘルプ",
+            title="ℹ️ ヘルプ",
             color=discord.Color.green()
         )
 
         embed.add_field(
-            name="Youtube検索",
-            value=(
-                "/youtube title: … Youtubeの動画を検索します、一日の使用制限あり...\n"
-            ),
-            name="🔴タイムアウト",
-            value=(
-                "/timeout user:Sou930 duration:10 … タイムアウトをします\n"
-            ),
-            name="🔴ロール付与",
-            value=(
-                "/giverole user:Sou930 role:Moderator …ロール付与をします\n"
+            name="🔍 YouTube検索",
+            value="/youtube title:キーワード … YouTubeの動画を検索します（使用制限あり）",
+            inline=False
+        )
+
+        embed.add_field(
+            name="🔴 タイムアウト（管理者）",
+            value="/timeout user:@ユーザー duration:10 … 指定時間タイムアウトします",
+            inline=False
+        )
+
+        embed.add_field(
+            name="🔴 ロール付与（管理者）",
+            value="/giverole user:@ユーザー role:Moderator … ロールを付与します",
             inline=False
         )
 
