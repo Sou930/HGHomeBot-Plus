@@ -18,10 +18,17 @@ class Help(commands.Cog):
             value=(
                 "/youtube title: … Youtubeの動画を検索します、一日の使用制限あり...\n"
             ),
+            name="🔴タイムアウト",
+            value=(
+                "/timeout user:Sou930 duration:10 … タイムアウトをします\n"
+            ),
+            name="🔴ロール付与",
+            value=(
+                "/giverole user:Sou930 role:Moderator …ロール付与をします
             inline=False
         )
 
-        embed.set_footer(text="HGHomeBot v0.1β対応")
+        embed.set_footer(text="HGHomeBot v0.1")
 
         await interaction.response.send_message(embed=embed)
 
