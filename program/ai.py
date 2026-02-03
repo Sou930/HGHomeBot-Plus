@@ -56,7 +56,7 @@ class AIChat(commands.Cog):
                 )
 
                 response = self.client.chat.completions.create(
-                    model="meta-llama/llama-3.3-70b-instruct:free",
+                    model="google/gemma-3n-e2b-it:free",
                     messages=messages_for_ai,
                     timeout=30.0
                 )
