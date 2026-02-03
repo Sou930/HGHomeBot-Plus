@@ -62,7 +62,7 @@ class AI(commands.Cog):
                         ],
                         "temperature": 0.7
                     },
-                    timeout=aiohttp.ClientTimeout(total=15)
+                    timeout=aiohttp.ClientTimeout(total=50)
                 ) as resp:
 
                     if resp.status != 200:
