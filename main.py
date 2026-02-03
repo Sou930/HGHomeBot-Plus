@@ -27,9 +27,11 @@ async def on_ready():
 async def setup(bot, db):
     from program.ticket import Ticket
     from program.help import Help
+    from program.youtube import YouTube
 
     await bot.add_cog(Ticket(bot))
     await bot.add_cog(Help(bot))
+    await bot.add_cog(YouTube(bot))
   
 try:
     from keep_alive import keep_alive
