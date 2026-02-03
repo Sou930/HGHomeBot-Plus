@@ -24,7 +24,7 @@ class Help(commands.Cog):
             ),
             name="🔴ロール付与",
             value=(
-                "/giverole user:Sou930 role:Moderator …ロール付与をします
+                "/giverole user:Sou930 role:Moderator …ロール付与をします\n"
             inline=False
         )
 
