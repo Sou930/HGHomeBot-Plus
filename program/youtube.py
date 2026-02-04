@@ -43,22 +43,17 @@ class YouTubeView(discord.ui.View):
     @discord.ui.button(label="◀ 前", style=discord.ButtonStyle.secondary)
     async def prev(self, interaction: discord.Interaction, button: discord.ui.Button):
         self.index = (self.index - 1) % len(self.videos)
-        await interaction.response.edit_message(
-            embed=self.make_embed(),
-            view=self
-        )
+        await interaction.response.edit_message(embed=self.make_embed(), view=self)
 
     @discord.ui.button(label="次 ▶", style=discord.ButtonStyle.secondary)
     async def next(self, interaction: discord.Interaction, button: discord.ui.Button):
         self.index = (self.index + 1) % len(self.videos)
-        await interaction.response.edit_message(
-            embed=self.make_embed(),
-            view=self
-        )
+        await interaction.response.edit_message(embed=self.make_embed(), view=self)
 
     async def on_timeout(self):
         for item in self.children:
             item.disabled = True
+
 
 class YouTube(commands.Cog):
     def __init__(self, bot):
@@ -68,61 +63,64 @@ class YouTube(commands.Cog):
         name="youtube",
         description="YouTube検索（ボタンUI・統計付き）"
     )
-    @app_commands.describe(title="検索する動画タイトル")
     async def youtube(self, interaction: discord.Interaction, title: str):
+        if not YOUTUBE_KEY:
+            await interaction.response.send_message(
+                "❌ YOUTUBE_KEY が設定されていません", ephemeral=True
+            )
+            return
+
         await interaction.response.defer()
 
-        try:
-            async with aiohttp.ClientSession() as session:
-                # 検索
-                search_resp = await session.get(
-                    "https://www.googleapis.com/youtube/v3/search",
-                    params={
-                        "part": "snippet",
-                        "q": title,
-                        "type": "video",
-                        "maxResults": 10,
-                        "key": YOUTUBE_KEY
-                    }
-                )
+        async with aiohttp.ClientSession() as session:
+            # 🔍 検索
+            async with session.get(
+                "https://www.googleapis.com/youtube/v3/search",
+                params={
+                    "part": "snippet",
+                    "q": title,
+                    "type": "video",
+                    "maxResults": 10,
+                    "key": YOUTUBE_KEY
+                }
+            ) as search_resp:
 
-                if search_resp.status == 403:
+                search_data = await search_resp.json()
+
+                if search_resp.status != 200:
                     await interaction.followup.send(
-                        "🚨 YouTube APIの利用上限に達しました…\n"
-                        "しばらく時間を置いてから試してください"
+                        f"❌ 検索APIエラー: {search_data.get('error', {}).get('message', '不明')}"
                     )
                     return
 
-                search_data = await search_resp.json()
-                videos = search_data.get("items", [])
+                videos = [
+                    v for v in search_data.get("items", [])
+                    if "videoId" in v["id"]
+                ]
 
                 if not videos:
                     await interaction.followup.send("🔍 見つかりませんでした")
                     return
 
-                video_ids = ",".join(v["id"]["videoId"] for v in videos)
+            video_ids = ",".join(v["id"]["videoId"] for v in videos)
 
-                # 統計
-                stats_resp = await session.get(
-                    "https://www.googleapis.com/youtube/v3/videos",
-                    params={
-                        "part": "statistics",
-                        "id": video_ids,
-                        "key": YOUTUBE_KEY
-                    }
-                )
-
-                if stats_resp.status == 403:
-                    await interaction.followup.send(
-                        "🚨 API上限に達してて統計情報が取れません…"
-                    )
-                    return
+            # 📊 統計
+            async with session.get(
+                "https://www.googleapis.com/youtube/v3/videos",
+                params={
+                    "part": "statistics",
+                    "id": video_ids,
+                    "key": YOUTUBE_KEY
+                }
+            ) as stats_resp:
 
                 stats_data = await stats_resp.json()
 
-        except aiohttp.ClientError:
-            await interaction.followup.send("❌ 通信エラーが起きました")
-            return
+                if stats_resp.status != 200:
+                    await interaction.followup.send(
+                        "⚠ 統計情報の取得に失敗しました"
+                    )
+                    return
 
         stats_map = {
             item["id"]: item["statistics"]
@@ -130,10 +128,8 @@ class YouTube(commands.Cog):
         }
 
         view = YouTubeView(videos, stats_map, interaction.user)
-        await interaction.followup.send(
-            embed=view.make_embed(),
-            view=view
-        )
+        await interaction.followup.send(embed=view.make_embed(), view=view)
+
 
 async def setup(bot):
     await bot.add_cog(YouTube(bot))
